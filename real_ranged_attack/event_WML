@@ -1,0 +1,283 @@
+wesnoth.game_events.on_mouse_move = function(x, y)
+    if not(wesnoth.interface.get_selected_hex() and wesnoth.interface.get_hovered_hex()) then
+        return false
+    end
+    local unit = wesnoth.units.get(wesnoth.interface.get_selected_hex() )
+    local second_unit = wesnoth.units.get(wesnoth.interface.get_hovered_hex() )
+    if not(unit and second_unit and unit.side == wml.variables["side_number"] and wesnoth.sides.is_enemy(unit.side,second_unit.side)) then
+        return false
+    end
+    local distance = wesnoth.map.distance_between(unit.loc, second_unit.loc)
+    if distance == 1 then
+        return false
+    end
+    local attack = "empty"
+    local attacking_weapon_index
+    for i = 1, #unit.attacks do
+        if unit.attacks[i].__cfg.max_range >= distance and distance >= unit.attacks[i].__cfg.min_range then
+            attack = unit.attacks[i] --for the menu, then I guess
+            attacking_weapon_index = i - 1
+        end
+    end
+    if attack == "empty" then
+        return false
+    end
+    std_print("need custom display(instead of the melee attack one (with move))")
+    return true
+end
+wesnoth.game_events.on_mouse_button = function(x, y, button, event)
+    if not (button == "left" and event == "click") then
+        return false
+    end
+    if not(wesnoth.interface.get_selected_hex() and wesnoth.interface.get_hovered_hex()) then
+        return false
+    end
+    local unit = wesnoth.units.get(wesnoth.interface.get_selected_hex() )
+    local second_unit = wesnoth.units.get(wesnoth.interface.get_hovered_hex() )
+    if not(unit and second_unit and unit.side == wml.variables["side_number"] and wesnoth.sides.is_enemy(unit.side,second_unit.side)) then
+        return false
+    end
+    local distance = wesnoth.map.distance_between(unit.loc, second_unit.loc)
+    if distance == 1 then
+        return false
+    end
+    local attack = "empty"
+    local attacking_weapon_index
+    for i = 1, #unit.attacks do
+        if unit.attacks[i].__cfg.max_range >= distance and distance >= unit.attacks[i].__cfg.min_range then
+            attack = unit.attacks[i] --for the menu, then I guess
+            attacking_weapon_index = i - 1
+        end
+    end
+    if attack == "empty" then
+        return false
+    end
+    -- it's 2,2 just for testing purspose
+    local unit_attack = wml.load '~add-ons/Bandits_from_Brown_Hills/gui/unit_attack.cfg'
+    local attack_predictions = wml.load '~add-ons/Bandits_from_Brown_Hills/gui/attack_predictions.cfg'
+    local red_green_scale="df0000,e20000,e40000,e70000,ea0000,ec0000,ef0000,f20000,f40000,f70000,fa0000,fc0000,ff0000,ff0500,ff0b00,ff1000,ff1500,ff1b00,ff2000,ff2500,ff2b00,ff3000,ff3500,ff3a00,ff4000,ff4500,ff4a00,ff5000,ff5500,ff5a00,ff6000,ff6500,ff6a00,ff7000,ff7500,ff7a00,ff8000,ff8500,ff8a00,ff8f00,ff9500,ff9a00,ff9f00,ffa500,ffaa00,ffaf00,ffb500,ffba00,ffbf00,ffc500,ffca00,ffcf00,ffd500,ffda00,ffdf00,ffe400,ffea00,ffef00,fff400,fffa00,ffff00,faff00,f4ff00,efff00,eaff00,e4ff00,dfff00,daff00,d5ff00,cfff00,caff00,c5ff00,bfff00,baff00,b5ff00,afff00,aaff00,a5ff00,9fff00,9aff00,95ff00,8fff00,8aff00,85ff00,80ff00,7aff00,75ff00,70ff00,6aff00,65ff00,60ff00,5aff00,55ff00,50ff00,4aff00,45ff00,40ff00,3aff00,35ff00,30ff00,2bff00,25ff00,20ff00,1bff00,15ff00,10ff00,0bff00,05ff00,00ff00,00fc00,00fa00,00f700,00f400,00f200,00ef00,00ec00,00ea00,00e700,00e400,00e200,00df00"
+    local unit_type_color="f5e6c1"
+    local function rgba_to_hex(color)
+        return string.format("#%02X%02X%02X%02X", color[1], color[2], color[3], color[4])
+    end
+    local function xp_color(xp_to_advance,can_advance,has_amla)
+        local near_advance_color ={255,255,255,255}
+        local mid_advance_color  ={150,255,255,255}
+        local far_advance_color  ={0,205,205,255}
+        local normal_color       ={0,160,225,255}
+        local near_amla_color    ={225,0,255,255}
+        local mid_amla_color     ={169,30,255,255}
+        local far_amla_color     ={139,0,237,255}
+        local amla_color         ={170,0,255,255}
+
+        local near_advance = math.floor(xp_to_advance) <= wesnoth.game_config.kill_experience
+        local mid_advance = math.floor(xp_to_advance) <= wesnoth.game_config.kill_experience * 2
+        local far_advance = math.floor(xp_to_advance) <= wesnoth.game_config.kill_experience * 3
+
+        local color = normal_color
+        if can_advance then
+            if near_advance then
+                color = near_advance_color
+            elseif mid_advance then
+                color = mid_advance_color
+            elseif far_advance then
+                color = far_advance_color
+            end
+        else
+            if has_amla then
+                if near_advance then
+                    color = near_amla_color
+                elseif mid_advance then
+                    color = mid_amla_color
+                elseif far_advance then
+                    color = far_amla_color
+                else
+                    color = amla_color
+                end
+            end
+        end
+        return(color)
+    end
+    local function red_green_scale_function(value)
+        value = math.max(0.0, math.min(100.0, value))
+        local colors = {}
+        for color in red_green_scale:gmatch("[^,]+") do
+            table.insert(colors, color)
+        end
+        local index = math.floor(value / 100 * (#colors - 1)) + 1
+        return colors[index]
+    end
+    function hp_color(hitpoints, max_hitpoints)
+        local unit_energy = 0.0
+        local energy_color = {0, 0, 0, 255}  -- {r, g, b, a}
+    
+        if max_hitpoints > 0 then
+            unit_energy = hitpoints / max_hitpoints
+        end
+    
+        if unit_energy == 1.0 then
+            energy_color[1] = 33
+            energy_color[2] = 225
+            energy_color[3] = 0
+        elseif unit_energy > 1.0 then
+            energy_color[1] = 100
+            energy_color[2] = 255
+            energy_color[3] = 100
+        elseif unit_energy >= 0.75 then
+            energy_color[1] = 170
+            energy_color[2] = 255
+            energy_color[3] = 0
+        elseif unit_energy >= 0.5 then
+            energy_color[1] = 255
+            energy_color[2] = 175
+            energy_color[3] = 0
+        elseif unit_energy >= 0.25 then
+            energy_color[1] = 255
+            energy_color[2] = 155
+            energy_color[3] = 0
+        else
+            energy_color[1] = 255
+            energy_color[2] = 0
+            energy_color[3] = 0
+        end
+    
+        return energy_color
+    end
+    function table_to_string(input)
+        local result = {}
+        for i, v in ipairs(input) do
+            table.insert(result, tostring(v))
+        end
+        return table.concat(result, ", ")
+    end
+    local leader_crown = "misc/leader-crown.png"
+    local size_normal=17
+    local size_small = 15 * (size_normal / 17)
+    local function draw_hp_graph(hp_graph, attacker, defender)
+        local graph_width = 270
+        local graph_height = 170
+        local graph_max_rows = 10
+        local fs = size_small
+        local hp_sep = 30
+        local percent_sep = 50
+        local bar_space = graph_width - hp_sep - percent_sep - 4
+        --local hp_graph_canvas = hp_graph:get_drawing_canvas()
+
+        local i = 0 
+        std_print(hp_graph)
+        -- hp_column_width = hp_sep --into the dialog
+        hp_graph:set_canvas(1, {wml.tag.text {font_size = fs,
+        text = "meow",
+        x = 4,
+        y=2 + (fs + 2) * i,
+        w="(text_width)",
+        h="(text_height)",
+    
+    
+    
+    
+    
+    
+    } } )
+    end
+
+    function preshow(dialog) --missing specials, abilities, for nil weapons, tooltip(s), buttons
+        local weapon_row = 1
+        for i = 1, #unit.attacks do
+            if unit.attacks[i].__cfg.max_range >= distance and distance >= unit.attacks[i].__cfg.min_range then
+                local unit_advances_to = unit.advances_to[1] ~= nil
+                local unit_amla = unit.advancements[1] ~= nil
+                local unit_mods = "~RC(magenta>" ..wesnoth.sides[unit.side].color .. ")"..unit.image_mods
+                if unit.canrecruit then
+                    unit_mods = unit_mods .. "~BLIT(" .. leader_crown .. ")"
+                end
+                for i2 = 1, #unit.overlays do
+                    unit_mods = unit_mods .. "~BLIT(" .. unit.overlays[i2] .. ")"
+                end
+                dialog["attacker_pane"].type_image.label=unit.__cfg.image .. unit_mods
+                dialog["attacker_pane"].type_details_minimal.use_markup = true
+                dialog["attacker_pane"].type_details_minimal.label="<span size='large'>"..unit.name.."</span>\n"
+                .."<span color='#"..unit_type_color.."'>"..unit.__cfg.language_name.."</span>\n"
+                .."Lvl "..unit.level.."\n"
+                ..unit.alignment.."\n"
+                ..table_to_string(unit.traits).."\n"
+                .."<span color='"..rgba_to_hex(hp_color(unit.hitpoints,unit.max_hitpoints)).."'>HP: "..unit.hitpoints.."/"..unit.max_hitpoints.."</span>\n"
+                .."<span color='"..rgba_to_hex(xp_color(unit.max_experience - unit.experience,unit_advances_to,unit_amla)).."'>XP: "..unit.experience.."/"..unit.max_experience.."</span>"
+                --dialog["attacker_pane"].type_name.label="type_name"
+                dialog["attacker_pane"].type_profile.on_button_click= function() gui.show_help("unit_"..unit.type) end
+                
+                local second_unit_advances_to = second_unit.advances_to[1] ~= nil
+                local second_unit_amla = second_unit.advancements[1] ~= nil
+                local second_unit_mods = "~RC(magenta>" ..wesnoth.sides[second_unit.side].color .. ")"..second_unit.image_mods
+                if second_unit.canrecruit then
+                    second_unit_mods = second_unit_mods .. "~BLIT(" .. leader_crown .. ")"
+                end
+                for i2 = 1, #second_unit.overlays do
+                    second_unit_mods = second_unit_mods .. "~BLIT(" .. second_unit.overlays[i2] .. ")"
+                end
+                second_unit_mods = second_unit_mods .. "~FL(horiz)"
+                dialog["defender_pane"].type_image.label=second_unit.__cfg.image .. second_unit_mods
+                dialog["defender_pane"].type_details_minimal.use_markup = true
+                dialog["defender_pane"].type_details_minimal.label="<span size='large'>"..second_unit.name.."</span>\n"
+                .."<span color='#"..unit_type_color.."'>"..second_unit.__cfg.language_name.."</span>\n"
+                .."Lvl "..second_unit.level.."\n"
+                ..second_unit.alignment.."\n"
+                ..table_to_string(second_unit.traits).."\n"
+                .."<span color='"..rgba_to_hex(hp_color(second_unit.hitpoints,second_unit.max_hitpoints)).."'>HP: "..second_unit.hitpoints.."/"..second_unit.max_hitpoints.."</span>\n"
+                .."<span color='"..rgba_to_hex(xp_color(second_unit.max_experience - second_unit.experience,second_unit_advances_to,second_unit_amla)).."'>XP: "..second_unit.experience.."/"..second_unit.max_experience.."</span>"
+                dialog["defender_pane"].type_profile.on_button_click= function() gui.show_help("unit_"..second_unit.type) end
+
+
+                
+                local weapon = unit.attacks[i]
+                local _,_,attacker_stats,defender_stats = wesnoth.simulate_combat(unit, i, second_unit)
+                local second_weapon = second_unit.attacks[defender_stats.attack_num + 1]
+                dialog["weapon_list"][weapon_row].attacker_weapon.use_markup = true
+                dialog["weapon_list"][weapon_row].attacker_weapon_icon.label = weapon.icon
+                dialog["weapon_list"][weapon_row].attacker_weapon.label="<b>"..weapon.name.."</b>\n"
+                ..weapon.type.."\n"
+                ..mathx.round(attacker_stats.damage).."×"..mathx.round(attacker_stats.num_blows).."\n"
+                .."<span color='#"..red_green_scale_function(attacker_stats.chance_to_hit).."'>"..mathx.round(attacker_stats.chance_to_hit).."%</span>"
+                dialog["weapon_list"][weapon_row].attacker_weapon.tooltip=""
+                dialog["weapon_list"][weapon_row].range.use_markup = true
+                dialog["weapon_list"][weapon_row].range.label="<span color='#a69275'>— "..weapon.range.." —</span>"
+                dialog["weapon_list"][weapon_row].defender_weapon.use_markup = true
+                dialog["weapon_list"][weapon_row].defender_weapon_icon.label = second_weapon.icon
+                dialog["weapon_list"][weapon_row].defender_weapon.label="<b>"..second_weapon.name.."</b>\n"
+                ..second_weapon.type.."\n"
+                ..mathx.round(defender_stats.damage).."×"..mathx.round(defender_stats.num_blows).."\n"
+                .."<span color='#"..red_green_scale_function(defender_stats.chance_to_hit).."'>"..mathx.round(defender_stats.chance_to_hit).."%</span>"
+
+                dialog.damage_calculation.on_button_click= function()
+                    function preshow(dialog)
+                        std_print(dialog["attacker_hp_graph"])
+                        draw_hp_graph(dialog["attacker_hp_graph"],unit,second_unit)
+                    end
+                    function postshow(dialog)
+                    end
+                    gui.show_dialog(wml.get_child(attack_predictions, 'resolution'), preshow, postshow)
+                end
+                
+                
+                weapon_row = weapon_row + 1
+                
+            end
+        end
+    end
+    function postshow(dialog)
+    end
+    gui.show_dialog(wml.get_child(unit_attack, 'resolution'), preshow, postshow)
+    std_print(attack)
+    local defending_weapon_index = nil
+    for i = 1, #second_unit.attacks do
+        if second_unit.attacks[i].__cfg.max_range >= distance and distance >= second_unit.attacks[i].__cfg.min_range then
+            defending_weapon_index = i - 1
+        end
+    end
+    std_print(defending_weapon_index)
+    wesnoth.wml_actions.do_command({
+        {"attack",{weapon = attacking_weapon_index,defender_weapon = defending_weapon_index,{"source", {x = unit.x, y = unit.y}}, {"destination", {x = second_unit.x, y = second_unit.y}}}}
+    }
+    )
+    return true
+end
